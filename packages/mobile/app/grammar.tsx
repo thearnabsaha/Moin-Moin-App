@@ -1141,6 +1141,25 @@ export default function GrammarScreen() {
         <Text style={[s.topTitle, { color: t.text }]}>Grammar</Text>
       </>
     ),
+    right: (
+      <TouchableOpacity
+        onPress={() => {
+          refreshProgress();
+          Alert.alert("Refreshed", "Grammar progress synchronized.");
+        }}
+        activeOpacity={0.7}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          backgroundColor: GRAMMAR_COLOR + "18",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <RefreshCw size={17} color={GRAMMAR_COLOR} strokeWidth={2.5} />
+      </TouchableOpacity>
+    ),
     accent: GRAMMAR_COLOR,
   });
 

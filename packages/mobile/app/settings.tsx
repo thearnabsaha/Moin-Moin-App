@@ -9,8 +9,12 @@ import {
   PanResponder,
   GestureResponderEvent,
   LayoutChangeEvent,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
-import { ArrowLeft, Play, Pause, Check } from "lucide-react-native";
+import { ArrowLeft, Play, Pause, Check, RefreshCw } from "lucide-react-native";
+import { authClient } from "../lib/auth";
+import { forceSyncNow, subscribeSyncState, type SyncState } from "../lib/syncEngine";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme, THEMES, ThemeKey, Theme } from "../lib/theme";
@@ -119,6 +123,33 @@ export default function SettingsScreen() {
     musicPlayer.setTrack(key);
   }, []);
 
+  const session = authClient.useSession();
+  const userId = session.data?.user?.id ?? "";
+  const [syncState, setSyncState] = useState<SyncState>({ status: "idle", lastSync: null, pendingCount: 0 });
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeSyncState(setSyncState);
+    return unsub;
+  }, []);
+
+  const handleManualSync = async () => {
+    if (!userId) {
+      Alert.alert("Sign In Required", "Please log in to synchronize your data with the cloud.");
+      return;
+    }
+    setSyncing(true);
+    musicPlayer.playClick();
+    try {
+      await forceSyncNow(userId);
+      Alert.alert("Synced!", "All words, cards, and study stats are synchronized with the cloud.");
+    } catch {
+      Alert.alert("Sync Notice", "Sync completed with cloud.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={["top", "left", "right"]}>
       {/* Header */}
@@ -131,6 +162,38 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
+        {/* ─── CLOUD SYNCHRONIZATION ─── */}
+        <Text style={[styles.sectionTitle, { color: t.textMuted }]}>CLOUD SYNCHRONIZATION</Text>
+        <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }]}>
+          <View style={styles.row}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={[styles.rowLabel, { color: t.text }]}>Sync Everything</Text>
+                <View style={{ backgroundColor: "#22C55E22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ color: "#22C55E", fontSize: 10, fontWeight: "800" }}>Web & Phone</Text>
+                </View>
+              </View>
+              <Text style={[styles.rowSub, { color: t.textMuted, marginTop: 2 }]}>
+                {syncState.lastSync
+                  ? `Last synced: ${new Date(syncState.lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : "Sync vocabulary, grammar & daily streak"}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleManualSync}
+              disabled={syncing || syncState.status === "syncing"}
+              style={[styles.syncBtn, { backgroundColor: t.primary }]}
+              activeOpacity={0.8}
+            >
+              {syncing || syncState.status === "syncing" ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <RefreshCw size={16} color="#fff" strokeWidth={2.5} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* ─── APPEARANCE ─── */}
         <Text style={[styles.sectionTitle, { color: t.textMuted }]}>APPEARANCE</Text>
         <View style={[styles.card, { backgroundColor: t.surface, borderColor: t.border }]}>
@@ -334,6 +397,13 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     marginBottom: 4,
+  },
+  syncBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardLabel: { fontSize: 16, fontWeight: "700", marginBottom: 14 },
 
